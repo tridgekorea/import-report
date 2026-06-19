@@ -1,4 +1,4 @@
-// ── 시장분석: computeHealthScore, computeFindings, callClaude, localInsights
+// 시장분석
 function computeHealthScore(portfolio,comparisons){
   var bd={};var cr=portfolio.concRisk;
   bd.concentration={score:cr<30?25:cr<50?18:cr<70?10:2,max:25,label:'공급사 분산도',icon:'🏭'};
@@ -290,3 +290,10 @@ function localInsights(portfolio,comparisons,companyName,promptTxt,companyMemo,h
 
 var charts={};
 // roiFactor 적용된 절감액 계산
+function getTotalRoi(){
+  var raw=Object.values(S.comparisons||{}).reduce(function(s,c){return s+(c?c.roiK:0);},0);
+  return +(raw*(S.roiFactor||0.5)).toFixed(0);
+}
+function getRawTotalRoi(){
+  return Object.values(S.comparisons||{}).reduce(function(s,c){return s+(c?c.roiK:0);},0);
+}

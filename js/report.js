@@ -1,90 +1,4 @@
-// ── 클라이언트 미팅보고서
-function exportClientReport(){
-  var exist=document.getElementById('client-report-modal');
-  if(exist)exist.remove();
-
-  var overlay=document.createElement('div');
-  overlay.id='client-report-modal';
-  overlay.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
-  overlay.innerHTML='<div style="background:var(--card);border-radius:18px;padding:32px;max-width:480px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.3)">'
-    +'<div style="font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.1em;margin-bottom:6px">미팅 보고서</div>'
-    +'<h2 style="font-size:20px;font-weight:700;color:var(--text1);margin-bottom:6px">📋 미팅 보고서 설정</h2>'
-    +'<p style="font-size:13px;color:var(--text2);margin-bottom:16px">Chart.js 시각화 + AI 인사이트가 포함된<br>C레벨 미팅용 HTML 보고서를 생성합니다.</p>'
-    +'<div style="display:flex;align-items:center;justify-content:space-between;background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:16px">'
-    +'<div><div style="font-size:13px;font-weight:600;color:var(--text1)">경쟁사 블라인드</div><div style="font-size:11px;color:var(--text3);margin-top:2px">ON: 경쟁사명 익명 처리 · 절감액 범위로만 표시</div></div>'
-    +'<div id="cr-blind-toggle" onclick="crBlind=!crBlind;this.style.background=crBlind?\'var(--teal)\':\'rgba(100,116,139,.3)\';this.querySelector(\'span\').style.transform=crBlind?\'translateX(20px)\':\'translateX(0)\';" style="width:44px;height:24px;border-radius:12px;background:rgba(100,116,139,.3);cursor:pointer;position:relative;transition:background .2s;flex-shrink:0"><span style="display:block;width:20px;height:20px;border-radius:50%;background:#fff;position:absolute;top:2px;left:2px;transition:transform .2s"></span></div>'
-    +'</div>'
-    +'<div style="margin-bottom:14px">'
-    +'<label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">보고서 제목</label>'
-    +'<input id="cr-title-input" type="text" value="'+(S.companyName||'고객사')+' 소싱 경쟁력 진단 보고서" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 13px;font-size:13px;color:var(--text1);background:var(--card2);font-family:inherit">'
-    +'</div>'
-    +'<div style="margin-bottom:20px">'
-    +'<label style="font-size:12px;font-weight:600;color:var(--text2);display:block;margin-bottom:6px">AI 추가 지시사항 <span style="font-weight:400;color:var(--text3)">(선택)</span></label>'
-    +'<textarea id="cr-extra-input" rows="3" placeholder="예시:&#10;• 경쟁사 비교 섹션을 더 강조해줘&#10;• Tridge 소개 섹션 빼줘&#10;• 영어로 작성해줘" style="width:100%;border:1px solid var(--border);border-radius:9px;padding:10px 13px;font-size:13px;color:var(--text1);background:var(--card2);font-family:inherit;resize:vertical;line-height:1.5"></textarea>'
-    +'</div>'
-    +'<div style="display:flex;gap:10px;justify-content:flex-end">'
-    +'<button onclick="var _o=document.getElementById(\'client-report-modal\');if(_o)_o.remove();" style="padding:10px 20px;border:1px solid var(--border);border-radius:9px;background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px">취소</button>'
-    +'<button id="cr-generate-btn" onclick="startClientReportGenerate()" style="padding:10px 24px;background:linear-gradient(135deg,#1A5C96,#00C9A7);border:none;border-radius:9px;color:#fff;cursor:pointer;font-family:inherit;font-size:13px;font-weight:700">📊 보고서 다운로드</button>'
-    +'</div>'
-    +'</div>';
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.remove();});
-  setTimeout(function(){var el=document.getElementById('cr-extra-input');if(el)el.focus();},100);
-}
-
-
-async function startClientReportGenerate(){
-  var extra=document.getElementById('cr-extra-input')?document.getElementById('cr-extra-input').value:'';
-  var title=document.getElementById('cr-title-input')?document.getElementById('cr-title-input').value:'';
-  var blind=typeof crBlind!=='undefined'&&crBlind;
-  var modal=document.getElementById('client-report-modal');
-  if(modal){
-    modal.querySelector('div').innerHTML=
-      '<div style="text-align:center;padding:20px 0">'
-      +'<div style="font-size:11px;font-weight:700;color:var(--teal);letter-spacing:.1em;margin-bottom:12px">미팅 보고서 생성</div>'
-      +'<h2 style="font-size:18px;font-weight:700;color:var(--text1);margin-bottom:24px">📋 보고서 생성 중...</h2>'
-      +'<div style="text-align:left;min-width:300px">'
-      +'<div id="crs-1" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text3)"><span class="crs-icon">⏳</span><span>데이터 분석 준비</span></div>'
-      +'<div id="crs-2" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text3)"><span class="crs-icon">⏳</span><span>AI 인사이트 생성 (최대 3분)</span></div>'
-      +'<div id="crs-3" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);color:var(--text3)"><span class="crs-icon">⏳</span><span>차트 & 보고서 조립</span></div>'
-      +'<div id="crs-4" style="display:flex;align-items:center;gap:10px;padding:10px 0;color:var(--text3)"><span class="crs-icon">⏳</span><span>파일 생성</span></div>'
-      +'</div>'
-      +'<div id="cr-done" style="display:none;margin-top:24px"></div>'
-      +'</div>';
-  }
-  function setStep(n,done){
-    var el=document.getElementById('crs-'+n);
-    if(!el)return;
-    el.style.color=done?'var(--teal)':'var(--amber,#F59E0B)';
-    el.querySelector('.crs-icon').textContent=done?'✅':'🔄';
-    el.style.fontWeight=done?'400':'700';
-  }
-  try{
-    var blob=await _buildClientReport(extra,title,setStep,blind);
-    var doneEl=document.getElementById('cr-done');
-    if(doneEl){
-      doneEl.style.display='block';
-      var a=document.createElement('a');
-      a.href=URL.createObjectURL(blob);
-      a.download=(title||S.companyName||'미팅보고서').replace(/\s/g,'_')+'_Tridge.html';
-      a.style.cssText='display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#1A5C96,#00C9A7);border-radius:10px;color:#fff;font-weight:700;font-size:14px;text-decoration:none;margin-bottom:10px';
-      a.textContent='📥 보고서 다운로드';
-      doneEl.appendChild(a);
-      var closeBtn=document.createElement('button');
-      closeBtn.textContent='닫기';
-      closeBtn.style.cssText='display:block;width:100%;margin-top:8px;padding:10px;border:1px solid var(--border);border-radius:9px;background:none;color:var(--text2);cursor:pointer;font-family:inherit;font-size:13px';
-      closeBtn.onclick=function(){var ov=document.getElementById('client-report-modal');if(ov)ov.remove();};
-      doneEl.appendChild(closeBtn);
-    }
-  }catch(e){
-    console.error('미팅보고서 오류:',e);
-    var modal2=document.getElementById('client-report-modal');
-    if(modal2)modal2.remove();
-    alert('보고서 생성 실패: '+e.message);
-  }
-}
-
-
+// 미팅보고서
 async function _buildClientReport(extraInstructions,customTitle,setStep,blindMode){
   var p=S.portfolio;
   var hs=S.healthScore;
@@ -544,3 +458,90 @@ async function _buildClientReport(extraInstructions,customTitle,setStep,blindMod
 // ═══════════════════════════════════════════
 // 콜드메일용 진단 리포트 (강한 블라인드 + 로우데이터 샘플)
 // ═══════════════════════════════════════════
+function roundNice(n){n=Math.abs(n);if(n<50)return Math.round(n/10)*10;if(n<500)return Math.round(n/50)*50;return Math.round(n/100)*100;}
+
+function savingsRange(comparisons){
+  var roiK=Object.values(comparisons||{}).reduce(function(s,c){return s+(c?c.roiK:0);},0);
+  var altK=Object.values(comparisons||{}).reduce(function(s,c){return s+(c?c.roiAltK:0);},0);
+  var tmK=Object.values(comparisons||{}).reduce(function(s,c){return s+((c&&c.timing)?c.timing.timingSaving:0);},0);
+  var low=roundNice(roiK*0.7);
+  var high=roundNice((roiK+altK+tmK)*1.15);
+  if(high<=low)high=roundNice(low*1.5);
+  return {low:low,high:high,hasData:roiK>0};
+}
+
+function coldFindings(portfolio,comparisons){
+  var f=[];
+  var allSS=[];Object.values(comparisons||{}).forEach(function(c){if(c&&c.sameSupplier)allSS=allSS.concat(c.sameSupplier);});
+  var roiK=Object.values(comparisons||{}).reduce(function(s,c){return s+(c?c.roiK:0);},0);
+  if(allSS.length>0&&roiK>0)f.push({icon:'💰',text:'현재 거래 중인 일부 공급사에서, <strong>동일 품목을 더 낮은 단가에 매입하는 시장 참여자들</strong>이 확인되었습니다. 동일 공급사·동일 품목 기준이라 협상 여지가 분명합니다. <span class="muted">(구체적 단가·업체명 비공개)</span>'});
+  var bestTiming=null;Object.values(comparisons||{}).forEach(function(cmp){if(cmp&&cmp.timing&&cmp.timing.timingSaving>5){if(!bestTiming||cmp.timing.timingSaving>bestTiming.timingSaving)bestTiming=cmp.timing;}});
+  if(bestTiming)f.push({icon:'📅',text:'주력 품목의 <strong>구매 시점이 시장 최저가 시즌과 어긋나 있는 패턴</strong>이 관찰되었습니다. 협상 없이 매수 타이밍 조정만으로도 추가 절감 여지가 있습니다.'});
+  if(portfolio.disappeared.length>0){var d=portfolio.disappeared[0];f.push({icon:'🚨',text:'<strong>'+esc(d.product)+'</strong> 품목이 최근 수입 중단된 것으로 보입니다. 단가 변동에 따라 소싱이 이탈하는 패턴으로, 대안 공급사 사전 확보가 권장됩니다.'});}
+  if(portfolio.yrData.length>=2&&f.length<3){var last=portfolio.yrData[portfolio.yrData.length-1],prev=portfolio.yrData[portfolio.yrData.length-2];var pc=prev.avgP>0?+(((last.avgP-prev.avgP)/prev.avgP)*100).toFixed(0):0;if(pc>5)f.push({icon:'📈',text:'평균 수입 단가가 전년 대비 <strong>'+pc+'% 상승</strong>한 것으로 나타났습니다. 시장 단가 모니터링을 통한 선매입 타이밍 포착이 필요한 시점입니다.'});}
+  var allAlt=[];Object.values(comparisons||{}).forEach(function(c){if(c&&c.altOrigins)allAlt=allAlt.concat(c.altOrigins);});
+  if(allAlt.length>0&&f.length<3)f.push({icon:'🌏',text:'현재 사용하지 않는 <strong>대안 원산지</strong>에서 더 낮은 시장 단가가 확인되었습니다. 공급 안정성과 원가를 동시에 개선할 수 있는 소싱 루트입니다.'});
+  if(f.length===0)f.push({icon:'📊',text:'귀사의 수입 포트폴리오를 시장 데이터와 대조한 결과, 소싱 최적화 기회가 관찰되었습니다.'});
+  return f.slice(0,3);
+}
+
+// 로우데이터 샘플: 자사 실데이터 + 경쟁사 익명화, 최근 1개월
+function buildRawSample(){
+  var cRows=S.portfolio.rows.filter(function(r){return r.date&&r.unitPrice>0;});
+  if(!cRows.length)return null;
+  var latest=null;cRows.forEach(function(r){if(!latest||r.date>latest)latest=r.date;});
+  var ly=latest.getFullYear(),lm=latest.getMonth();
+  function inMonth(r){return r.date&&r.date.getFullYear()===ly&&r.date.getMonth()===lm;}
+  var cSample=cRows.filter(inMonth);
+  if(cSample.length<3)cSample=cRows.slice(-10);
+  // 귀사 데이터만 — 경쟁사 행 일절 포함하지 않음 (수산물 계약거래 특성상 단가 1건도 민감정보)
+  var rows=cSample.slice(0,12).map(function(r){return {date:r.date,prod:r.productName.split('__')[0].trim().slice(0,26),origin:r.origin,vol:r.volume,price:r.unitPrice};});
+  rows.sort(function(a,b){return b.date-a.date;});
+  return rows.slice(0,12);
+}
+
+// ─── 최근 6개월: 귀사 평균 vs "더 싸게 사는 바이어 전부" 평균 ───
+function sixMonthBenchmark(){
+  var results=[];
+  if(!S.marketFiles.length)return results;
+  // 회사 데이터의 최신 시점 기준 6개월 창
+  var cAllRows=S.portfolio.rows.filter(function(r){return r.date&&r.unitPrice>0;});
+  if(!cAllRows.length)return results;
+  var latest=null;cAllRows.forEach(function(r){if(!latest||r.date>latest)latest=r.date;});
+  var cutoff=new Date(latest);cutoff.setMonth(cutoff.getMonth()-6);
+  var kwClean=(S.importerKw||S.portfolio.topImporter||'').toLowerCase().replace(/[()주식회사 ]/g,'').slice(0,5);
+  Object.keys(S.comparisons).forEach(function(cat){
+    var mf=null;for(var k=0;k<S.marketFiles.length;k++){var lbl=S.marketFiles[k].label||(S.marketFiles[k].file.name.replace(/\.xlsx?|\.csv/gi,'').replace(/_/g,' ').trim());if(lbl===cat){mf=S.marketFiles[k];break;}}
+    if(!mf||!mf.raw)return;
+    var cmpObj=S.comparisons[cat]||{};var pkw=(cmpObj.productFilter||'').toLowerCase().trim();
+    // 회사 6개월 평균 (기준 상품 필터 반영)
+    var cRows=cAllRows.filter(function(r){return r.date>=cutoff&&(!pkw||r.productName.toLowerCase().includes(pkw));});
+    if(cRows.length<2)return;
+    var cVol=cRows.reduce(function(s,r){return s+r.volume;},0);
+    var cAvg=cRows.reduce(function(s,r){return s+r.unitPrice*r.volume;},0)/cVol;
+    // 시장(경쟁사) 6개월
+    var mRows=mf.raw.map(normRow).filter(function(r){return r.volume>0&&r.unitPrice>0&&r.date&&r.date>=cutoff&&(!pkw||r.productName.toLowerCase().includes(pkw));});
+    var others=p99filter(mRows.filter(function(r){return !r.importer.toLowerCase().replace(/[()주식회사 ]/g,'').includes(kwClean);}));
+    if(others.length<3)return;
+    // 바이어별 평균 → 귀사보다 싼 바이어 전부
+    var byImp={};others.forEach(function(r){if(!byImp[r.importer])byImp[r.importer]={vol:0,pv:0};byImp[r.importer].vol+=r.volume;byImp[r.importer].pv+=r.unitPrice*r.volume;});
+    var cheaper=Object.values(byImp).map(function(d){return {avg:d.pv/d.vol,vol:d.vol,pv:d.pv};}).filter(function(d){return d.avg<cAvg;});
+    if(!cheaper.length)return; // 더 싸게 사는 그룹 없으면 스킵 (단가는 강점)
+    var grpVol=cheaper.reduce(function(s,d){return s+d.vol;},0);
+    var grpAvg=cheaper.reduce(function(s,d){return s+d.pv;},0)/grpVol;
+    var diffPct=+(((cAvg-grpAvg)/cAvg)*100).toFixed(0);
+    var diffKgLow=+((cAvg-grpAvg)*0.85).toFixed(2);
+    var diffKgHigh=+((cAvg-grpAvg)*1.15).toFixed(2);
+    results.push({cat:cat,cAvg:+cAvg.toFixed(3),diffPct:diffPct,diffKgLow:diffKgLow,diffKgHigh:diffKgHigh,buyerCount:cheaper.length,productFilter:pkw});
+  });
+  return results;
+}
+
+// ─── 헬스스코어 약점 자동 추출 (단가가 강할 때 백업 메시지) ───
+function weakestPoint(){
+  if(!S.healthScore)return null;
+  var bd=S.healthScore.breakdown;var arr=[];
+  Object.keys(bd).forEach(function(k){arr.push({key:k,ratio:bd[k].score/bd[k].max,label:bd[k].label});});
+  arr.sort(function(a,b){return a.ratio-b.ratio;});
+  return arr[0];
+}

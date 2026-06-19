@@ -1,2 +1,5 @@
-// ── 전역 상태 & 설정
+// 전역 상태
+
 var S={step:1,roiFactor:0.5,companyFile:null,companyRaw:null,marketFiles:[],comparisons:{},portfolio:null,insights:null,companyName:'',importerKw:'',companyMemo:'',apiKey:'',tridgeCost:null,tridgeNeg:false,repEmail:'',repName:'',blindMode:false,activeCategory:0,activeSup:0,healthScore:null,waterfall:null,negMatrix:null,actionCards:null,findings:null,loading:false,loadingMsg:'',loadingSteps:[],loadingCurrentStep:0,selectedCategories:[],categoryMatchings:{},reportType:'strategy',liveMode:false,companyResearch:null,researchLoading:false,dataViewer:{open:false,cat:'',excludedIdx:{}}};
+
+var APP_SETTINGS={theme:'dark',fontSize:'md',compactMode:false};

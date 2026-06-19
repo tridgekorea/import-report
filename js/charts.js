@@ -1,4 +1,4 @@
-// ── 차트 함수
+// 차트함수
 function mkChart(id,cfg){if(charts[id])charts[id].destroy();var el=document.getElementById(id);if(!el)return;charts[id]=new Chart(el,cfg);}
 var GC='rgba(255,255,255,0.06)',TC='#7A95B8';
 var PIE=['#00C9A7','#3B82F6','#F59E0B','#EF4444','#8B5CF6','#EC4899','#10B981','#64748B','#F97316','#06B6D4'];
@@ -93,3 +93,157 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 function tag(cls,text){return '<span class="tag '+cls+'">'+esc(text)+'</span>';}
 function alrt(cls,html){return '<div class="alert '+cls+'">'+html+'</div>';}
 function cap(html){return '<div class="chart-cap">'+html+'</div>';}
+
+function renderStepBar(){
+  var h='';
+  STEPS.forEach(function(s){
+    var sn=s.sn;
+    var isA=S.step===sn;
+    var isD=(S.step>sn)||(S.step===3.5&&sn===3)||(S.step>=4&&sn===3.5);
+    var cls='si'+(isA?' active':isD?' done':'')+(s.sub?' sub':'');
+    h+='<div class="'+cls+'" onclick="gs('+sn+')"><div class="sn">'+s.n+'</div><span class="sl">'+s.l+'</span>'+(isD?'<div class="sc">✓</div>':'')+'</div>';
+  });
+  document.getElementById('stepbar').innerHTML=h;
+}
+function gs(n){if(n>1&&!S.portfolio)return;if(n===3.5&&!Object.keys(S.categoryMatchings).length)return;S.step=n;render();}
+
+
+/* ── v6 NEW FUNCTIONS ── */
+function rCategorySelect(){
+  var p=S.portfolio;
+  if(!p)return '<div class="empty-state"><p>포트폴리오 분석을 먼저 실행해주세요.</p></div>';
+  var cats=p.hsData||[];
+  var selSet={};S.selectedCategories.forEach(function(k){selSet[k]=true;});
+
+  var catCards='';
+  cats.forEach(function(c){
+    if(!c.key||c.key==='undefined')return;
+    var sel=selSet[c.key];
+    var displayName=c.categoryName||c.key;
+    var subLine=(c.topProductName&&c.topProductName!==displayName)?c.topProductName:'';
+    var hsTag=c.hsCode&&c.hsCode!==c.key?'HS '+c.hsCode:'';
+    catCards+='<div class="cat-select-card'+(sel?' selected':'')+'" onclick="toggleCat(\''+c.key.replace(/'/g,'\\\'')+'\')">'
+      +'<div class="cat-check">'+(sel?'✓':'')+'</div>'
+      +'<div class="cat-info">'
+      +'<div class="cat-name">'+esc(displayName)+'</div>'
+      +(subLine?'<div style="font-size:11px;color:var(--teal);margin-bottom:2px">'+esc(subLine)+'</div>':'')
+      +'<div class="cat-meta">'+(hsTag?'<span style="font-size:10px;font-family:monospace;color:var(--text3)">'+hsTag+'</span> · ':'')+Math.round((c.volTons||0))+'t · $'+(c.avgP||0)+'/kg · '+(c.pct||0)+'% · '+(c.cnt||0)+'건</div>'
+      +'</div></div>';
+  });
+
+  var typeHtml='<div class="report-type-row">'
+    +'<div class="rt-card'+(S.reportType==='strategy'?' active':'')+'" onclick="S.reportType=\'strategy\';render()">'
+    +'<div class="rt-icon">📊</div><div class="rt-name">초기미팅 전략보고서</div><div class="rt-desc">신규 고객 · 갭 분석 · ROI 제안</div></div>'
+    +'<div class="rt-card'+(S.reportType==='renewal'?' active':'')+'" onclick="S.reportType=\'renewal\';render()">'
+    +'<div class="rt-icon">🔄</div><div class="rt-name">재계약 제안서</div><div class="rt-desc">기존 고객 · Before/After · 성과 증명</div></div>'
+    +'</div>';
+
+  var mfUploads='';
+  if(S.selectedCategories.length>0){
+    while(S.marketFiles.length<S.selectedCategories.length)S.marketFiles.push({file:null,label:'',raw:null,productKw:''});
+    mfUploads='<div class="card"><div class="ctitle">📁 카테고리별 시장 데이터 업로드</div>'
+      +'<p style="font-size:12px;color:var(--text2);margin-bottom:16px">선택한 카테고리별 Tridge Explorer 시장 데이터를 업로드해주세요.</p>';
+    S.selectedCategories.forEach(function(cat,i){
+      var mf=S.marketFiles[i];
+      var got=(mf&&mf.file)?'got':'';
+      mfUploads+='<div style="margin-bottom:12px">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:6px">📂 '+esc(cat)+'</div>'
+        +'<label class="ubox-sm '+got+'" onclick="document.getElementById(\'mf-'+i+'\').click()">'
+        +(mf&&mf.file
+          ?'<div style="font-size:12px;font-weight:600;color:var(--teal)">✓ '+esc(mf.file.name)+'</div>'
+          :'<div style="font-size:13px;color:var(--text2)">📊 '+esc(cat)+' 시장 데이터 업로드</div>')
+        +'</label>'
+        +'<input type="file" id="mf-'+i+'" accept=".xlsx,.xls,.csv" onchange="loadCatFile(event,'+i+',S.selectedCategories['+i+'])" style="display:none">'
+        +'</div>';
+    });
+    mfUploads+='</div>';
+  }
+
+  var hasMarket=S.marketFiles.filter(function(m){return m&&m.file;}).length>0;
+
+  return '<div class="fade-in">'
+    +'<div class="sec-header"><div><div class="sec-eyebrow" style="color:var(--teal)">Step 3</div>'
+    +'<h2 class="sec-title">카테고리 선택 & 매칭 설정</h2>'
+    +'<p class="sec-sub">분석할 카테고리를 선택하고 시장 데이터를 업로드하세요 (최대 3개)</p></div>'
+    +'<button class="btn-ghost btnsm" onclick="S.step=2;render()">← 포트폴리오</button></div>'
+    +'<div class="card"><div class="ctitle">📄 보고서 유형</div>'+typeHtml+'</div>'
+    +'<div class="card">'
+    +'<div class="ctitle">📦 분석 카테고리 <span class="cbadge">'+S.selectedCategories.length+'/3 선택</span>'
+    +'<span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:8px">총 '+cats.length+'개 카테고리</span></div>'
+    +(catCards
+      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'+catCards+'</div>'
+      :'<div style="color:var(--text3);font-size:13px;padding:12px 0">포트폴리오에서 카테고리 데이터를 찾지 못했습니다. HS코드 컬럼을 확인해주세요.</div>')
+    +'</div>'
+    +mfUploads
+    +'<div style="text-align:center;padding:8px 0">'
+    +(S.selectedCategories.length>0&&hasMarket
+      ?'<button class="btn-primary" onclick="runMatching()">🤖 AI 품목 매칭 분석 →</button> '
+      :'')
+    +(S.selectedCategories.length>0
+      ?'<button class="btn-ghost" onclick="runComparisonDirect()">시장 데이터 없이 분석 →</button>'
+      :'')
+    +'</div></div>';
+}
+
+function toggleCat(key){
+  var idx=S.selectedCategories.indexOf(key);
+  if(idx>=0){S.selectedCategories.splice(idx,1);}
+  else if(S.selectedCategories.length<3){S.selectedCategories.push(key);}
+  render();
+}
+
+function loadCatFile(e,idx,catName){
+  var f=e.target.files[0];if(!f)return;
+  while(S.marketFiles.length<=idx)S.marketFiles.push({file:null,label:'',raw:null,productKw:''});
+  S.marketFiles[idx].file=f;S.marketFiles[idx].label=catName;S.marketFiles[idx].raw=null;
+  e.target.value='';render();
+}
+
+
+// ══════════════════════════════════════
+// 데이터 흐름 v2 — 단일 경로, 명확한 상태
+// ══════════════════════════════════════
+
+// 상태 초기화
+function resetFlow(){
+  S.portfolio=null;
+  S.comparisons={};
+  S.categoryMatchings={};
+  S.selectedCategories=[];
+  S.marketFiles=[];
+  S.insights=null;
+  S.healthScore=null;
+  S.waterfall=null;
+  S.negMatrix=null;
+  S.actionCards=null;
+  S.findings=null;
+  S.dataViewer={open:false,cat:'',excludedIdx:{}};
+}
+
+// ── STEP A: 포트폴리오 분석 ──
+async function runPortfolio(){
+  if(!S.companyFile){alert('기준 기업 데이터를 먼저 업로드해주세요.');return;}
+  S.loading=true;
+  S.loadingSteps=['기준 기업 데이터 읽기','포트폴리오 분석','연도별·카테고리·공급사 집계'];
+  S.loadingCurrentStep=0;
+  S.loadingMsg='📂 데이터 읽는 중...';render();
+  try{
+    var raw=await readExcel(S.companyFile);
+    S.companyRaw=raw;
+    S.loadingCurrentStep=1;S.loadingMsg='📊 포트폴리오 분석 중...';render();
+    S.portfolio=analyzePortfolio(raw);
+    if(!S.portfolio||!S.portfolio.rows.length){throw new Error('유효한 거래 데이터가 없습니다.');}
+    // 고객사명 자동 감지
+    if(!S.companyName&&S.portfolio.topImporter)S.companyName=S.portfolio.topImporter;
+    if(!S.importerKw&&S.portfolio.topImporter)S.importerKw=S.portfolio.topImporter;
+    S.loading=false;
+    S.step=2;
+    render();
+  }catch(e){
+    S.loading=false;
+    alert('분석 오류: '+e.message);
+    render();
+  }
+}
+
+// ── STEP B: AI 품목 매칭 실행 ──

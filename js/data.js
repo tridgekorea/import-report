@@ -1,4 +1,4 @@
-// ── 데이터 처리: readExcel, normRow, aggBy, analyzePortfolio, compareMarket
+// 데이터 처리
 function readExcel(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(e){try{var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});res(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''}));}catch(err){rej(err);}};r.onerror=function(){rej(new Error('파일 읽기 실패'));};r.readAsArrayBuffer(file);});}
 
 function normRow(row){

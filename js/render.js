@@ -1,141 +1,240 @@
-// ── UI 렌더링 함수
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function tag(cls,text){return '<span class="tag '+cls+'">'+esc(text)+'</span>';}
-function alrt(cls,html){return '<div class="alert '+cls+'">'+html+'</div>';}
-function cap(html){return '<div class="chart-cap">'+html+'</div>';}
+// UI렌더링
+async function runComparison(){
+  S.loading=true;
+  S.loadingSteps=['시장 비교 분석','헬스스코어 · ROI 계산','AI 인사이트 생성'];
+  S.loadingCurrentStep=0;
+  S.comparisons={};
 
-function renderStepBar(){
-  var h='';
-  STEPS.forEach(function(s){
-    var sn=s.sn;
-    var isA=S.step===sn;
-    var isD=(S.step>sn)||(S.step===3.5&&sn===3)||(S.step>=4&&sn===3.5);
-    var cls='si'+(isA?' active':isD?' done':'')+(s.sub?' sub':'');
-    h+='<div class="'+cls+'" onclick="gs('+sn+')"><div class="sn">'+s.n+'</div><span class="sl">'+s.l+'</span>'+(isD?'<div class="sc">✓</div>':'')+'</div>';
-  });
-  document.getElementById('stepbar').innerHTML=h;
-}
-function gs(n){if(n>1&&!S.portfolio)return;if(n===3.5&&!Object.keys(S.categoryMatchings).length)return;S.step=n;render();}
+  for(var i=0;i<S.selectedCategories.length;i++){
+    var cat=S.selectedCategories[i];
+    var mf=S.marketFiles[i];
+    if(!mf||!mf.file)continue;
+    if(!mf.raw)mf.raw=await readExcel(mf.file);
 
+    // 승인된 품목들 → OR 필터 키워드로 변환
+    var matching=S.categoryMatchings[cat];
+    var approvedMktProds=[];
+    if(matching&&matching.matches){
+      approvedMktProds=matching.matches
+        .filter(function(m){return m.approved;})
+        .map(function(m){return m.mktProd;});
+    }
 
-/* ── v6 NEW FUNCTIONS ── */
-function rCategorySelect(){
-  var p=S.portfolio;
-  if(!p)return '<div class="empty-state"><p>포트폴리오 분석을 먼저 실행해주세요.</p></div>';
-  var cats=p.hsData||[];
-  var selSet={};S.selectedCategories.forEach(function(k){selSet[k]=true;});
+    // 승인된 품목 없으면 카테고리명으로 fallback
+    var productKw='';
+    if(approvedMktProds.length){
+      productKw=approvedMktProds.join(',');
+    } else {
+      // 카테고리명에서 핵심 키워드 추출 (예: "주꾸미(냉동)" → "주꾸미")
+      productKw=cat.replace(/[（）\(\)냉동냉장생물 ]/g,'').trim()||cat;
+    }
 
-  var catCards='';
-  cats.forEach(function(c){
-    if(!c.key||c.key==='undefined')return;
-    var sel=selSet[c.key];
-    var displayName=c.categoryName||c.key;
-    var subLine=(c.topProductName&&c.topProductName!==displayName)?c.topProductName:'';
-    var hsTag=c.hsCode&&c.hsCode!==c.key?'HS '+c.hsCode:'';
-    catCards+='<div class="cat-select-card'+(sel?' selected':'')+'" onclick="toggleCat(\''+c.key.replace(/'/g,'\\\'')+'\')">'
-      +'<div class="cat-check">'+(sel?'✓':'')+'</div>'
-      +'<div class="cat-info">'
-      +'<div class="cat-name">'+esc(displayName)+'</div>'
-      +(subLine?'<div style="font-size:11px;color:var(--teal);margin-bottom:2px">'+esc(subLine)+'</div>':'')
-      +'<div class="cat-meta">'+(hsTag?'<span style="font-size:10px;font-family:monospace;color:var(--text3)">'+hsTag+'</span> · ':'')+Math.round((c.volTons||0))+'t · $'+(c.avgP||0)+'/kg · '+(c.pct||0)+'% · '+(c.cnt||0)+'건</div>'
-      +'</div></div>';
-  });
-
-  var typeHtml='<div class="report-type-row">'
-    +'<div class="rt-card'+(S.reportType==='strategy'?' active':'')+'" onclick="S.reportType=\'strategy\';render()">'
-    +'<div class="rt-icon">📊</div><div class="rt-name">초기미팅 전략보고서</div><div class="rt-desc">신규 고객 · 갭 분석 · ROI 제안</div></div>'
-    +'<div class="rt-card'+(S.reportType==='renewal'?' active':'')+'" onclick="S.reportType=\'renewal\';render()">'
-    +'<div class="rt-icon">🔄</div><div class="rt-name">재계약 제안서</div><div class="rt-desc">기존 고객 · Before/After · 성과 증명</div></div>'
-    +'</div>';
-
-  var mfUploads='';
-  if(S.selectedCategories.length>0){
-    while(S.marketFiles.length<S.selectedCategories.length)S.marketFiles.push({file:null,label:'',raw:null,productKw:''});
-    mfUploads='<div class="card"><div class="ctitle">📁 카테고리별 시장 데이터 업로드</div>'
-      +'<p style="font-size:12px;color:var(--text2);margin-bottom:16px">선택한 카테고리별 Tridge Explorer 시장 데이터를 업로드해주세요.</p>';
-    S.selectedCategories.forEach(function(cat,i){
-      var mf=S.marketFiles[i];
-      var got=(mf&&mf.file)?'got':'';
-      mfUploads+='<div style="margin-bottom:12px">'
-        +'<div style="font-size:12px;font-weight:700;color:var(--teal);margin-bottom:6px">📂 '+esc(cat)+'</div>'
-        +'<label class="ubox-sm '+got+'" onclick="document.getElementById(\'mf-'+i+'\').click()">'
-        +(mf&&mf.file
-          ?'<div style="font-size:12px;font-weight:600;color:var(--teal)">✓ '+esc(mf.file.name)+'</div>'
-          :'<div style="font-size:13px;color:var(--text2)">📊 '+esc(cat)+' 시장 데이터 업로드</div>')
-        +'</label>'
-        +'<input type="file" id="mf-'+i+'" accept=".xlsx,.xls,.csv" onchange="loadCatFile(event,'+i+',S.selectedCategories['+i+'])" style="display:none">'
-        +'</div>';
-    });
-    mfUploads+='</div>';
+    S.loadingMsg='🌏 '+cat+' 시장 비교 중...';render();
+    var lbl=cat;
+    S.comparisons[lbl]=compareMarket(S.portfolio,mf.raw,S.importerKw,productKw);
+    S.comparisons[lbl]._category=cat;
+    S.comparisons[lbl]._approvedProds=approvedMktProds;
   }
 
-  var hasMarket=S.marketFiles.filter(function(m){return m&&m.file;}).length>0;
+  S.loadingCurrentStep=1;S.loadingMsg='🎯 헬스스코어·ROI 계산 중...';render();
+  S.healthScore=computeHealthScore(S.portfolio,S.comparisons);
+  S.waterfall=computeWaterfall(S.comparisons);
+  S.negMatrix=computeNegMatrix(S.comparisons);
+  S.actionCards=computeActionCards(S.portfolio,S.comparisons);
 
-  return '<div class="fade-in">'
-    +'<div class="sec-header"><div><div class="sec-eyebrow" style="color:var(--teal)">Step 3</div>'
-    +'<h2 class="sec-title">카테고리 선택 & 매칭 설정</h2>'
-    +'<p class="sec-sub">분석할 카테고리를 선택하고 시장 데이터를 업로드하세요 (최대 3개)</p></div>'
-    +'<button class="btn-ghost btnsm" onclick="S.step=2;render()">← 포트폴리오</button></div>'
-    +'<div class="card"><div class="ctitle">📄 보고서 유형</div>'+typeHtml+'</div>'
-    +'<div class="card">'
-    +'<div class="ctitle">📦 분석 카테고리 <span class="cbadge">'+S.selectedCategories.length+'/3 선택</span>'
-    +'<span style="font-size:11px;color:var(--text3);font-weight:400;margin-left:8px">총 '+cats.length+'개 카테고리</span></div>'
-    +(catCards
-      ?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">'+catCards+'</div>'
-      :'<div style="color:var(--text3);font-size:13px;padding:12px 0">포트폴리오에서 카테고리 데이터를 찾지 못했습니다. HS코드 컬럼을 확인해주세요.</div>')
-    +'</div>'
-    +mfUploads
-    +'<div style="text-align:center;padding:8px 0">'
-    +(S.selectedCategories.length>0&&hasMarket
-      ?'<button class="btn-primary" onclick="runMatching()">🤖 AI 품목 매칭 분석 →</button> '
-      :'')
-    +(S.selectedCategories.length>0
-      ?'<button class="btn-ghost" onclick="runComparisonDirect()">시장 데이터 없이 분석 →</button>'
-      :'')
-    +'</div></div>';
-}
+  S.loadingMsg='🔍 AI 핵심 발견 분석 중...';render();
+  S.findings=await computeFindings(S.portfolio,S.comparisons,S.healthScore);
 
-function toggleCat(key){
-  var idx=S.selectedCategories.indexOf(key);
-  if(idx>=0){S.selectedCategories.splice(idx,1);}
-  else if(S.selectedCategories.length<3){S.selectedCategories.push(key);}
+  S.loadingCurrentStep=2;S.loadingMsg='🤖 AI 미팅 인사이트 생성 중...';render();
+  S.insights=await callClaude(S.portfolio,S.comparisons,S.companyName,S.apiKey,S.companyMemo,S.healthScore);
+
+  S.loading=false;
+  S.step=4;
+  saveAnalysis(); // 자동 저장
   render();
 }
 
-function loadCatFile(e,idx,catName){
-  var f=e.target.files[0];if(!f)return;
-  while(S.marketFiles.length<=idx)S.marketFiles.push({file:null,label:'',raw:null,productKw:''});
-  S.marketFiles[idx].file=f;S.marketFiles[idx].label=catName;S.marketFiles[idx].raw=null;
-  e.target.value='';render();
-}
-
-
-// ══════════════════════════════════════
-// 데이터 흐름 v2 — 단일 경로, 명확한 상태
-// ══════════════════════════════════════
-
-// 상태 초기화
-function resetFlow(){
-  S.portfolio=null;
+// ── 카테고리 없이 바로 분석 (시장데이터 없는 경우) ──
+async function runComparisonDirect(){
+  S.loading=true;S.loadingMsg='🎯 분석 중...';render();
   S.comparisons={};
-  S.categoryMatchings={};
-  S.selectedCategories=[];
-  S.marketFiles=[];
-  S.insights=null;
-  S.healthScore=null;
-  S.waterfall=null;
-  S.negMatrix=null;
-  S.actionCards=null;
-  S.findings=null;
-  S.dataViewer={open:false,cat:'',excludedIdx:{}};
+  S.healthScore=computeHealthScore(S.portfolio,{});
+  S.waterfall=computeWaterfall({});
+  S.negMatrix=computeNegMatrix({});
+  S.actionCards=computeActionCards(S.portfolio,{});
+  S.findings=await computeFindings(S.portfolio,{},S.healthScore);
+  S.loadingMsg='🤖 AI 인사이트 생성 중...';render();
+  S.insights=await callClaude(S.portfolio,{},S.companyName,S.apiKey,S.companyMemo,S.healthScore);
+  S.loading=false;S.step=4;render();
 }
 
-// ── STEP A: 포트폴리오 분석 ──
-async function runPortfolio(){
-  if(!S.companyFile){alert('기준 기업 데이터를 먼저 업로드해주세요.');return;}
-  S.loading=true;
-  S.loadingSteps=['기준 기업 데이터 읽기','포트폴리오 분석','연도별·카테고리·공급사 집계'];
-  S.loadingCurrentStep=0;
+// compareMarket 필터 — 콤마 구분 OR 조건
+function matchProductKw(productName, pkwList){
+  if(!pkwList||!pkwList.length)return true;
+  var n=productName.toLowerCase().replace(/\[.*?\]\s*/g,'').replace(/__.*$/,'');
+  // 쭈꾸미/주꾸미 정규화
+  n=n.replace(/쭈꾸미/g,'주꾸미').replace(/쭈구미/g,'주꾸미');
+  return pkwList.some(function(kw){
+    var k=kw.toLowerCase().replace(/쭈꾸미/g,'주꾸미').trim();
+    if(!k)return false;
+    // 양방향 포함 체크 (짧은 키워드가 긴 이름에 포함되거나 반대)
+    return n.includes(k)||k.includes(n.slice(0,Math.min(n.length,6)));
+  });
+}
+
+
+function rInsightsV6(){
+  var base=rInsights();
+  var modeBar='<div class="mode-bar">'
+    +'<span class="mode-title">출력 모드</span>'
+    +'<div class="mode-btns">'
+    +'<button class="mode-btn'+(S.liveMode?'':' active')+'" onclick="S.liveMode=false;render()">📋 사전준비 모드</button>'
+    +'<button class="mode-btn'+(S.liveMode?' active':'')+'" onclick="enterLiveMode()">🎤 라이브 시연 모드</button>'
+    +'</div>'
+    +'<span class="mode-desc">'+(S.liveMode?'미팅 현장 풀스크린 뷰':'보고서 출력 / 콜드메일용')+'</span>'
+    +'</div>';
+  return base.replace('<div class="fade-in">','<div class="fade-in">'+modeBar);
+}
+
+function enterLiveMode(){
+  S.liveMode=true;S.blindMode=true;
+  var existing=document.getElementById('live-overlay');
+  if(existing)existing.remove();
+  var el=document.createElement('div');
+  el.id='live-overlay';
+  el.innerHTML=buildLiveHTML();
+  document.body.appendChild(el);
+}
+
+function buildLiveHTML(){
+  var p=S.portfolio;var hs=S.healthScore;
+  var totalRoi=getTotalRoi();
+  var findings=S.findings||[];
+  return '<div style="position:fixed;inset:0;background:var(--bg);z-index:9999;overflow-y:auto">'
+    +'<div style="position:sticky;top:0;background:rgba(5,12,26,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;z-index:100">'
+    +'<div style="display:flex;align-items:center;gap:14px">'
+    +'<div style="font-size:15px;font-weight:800;color:var(--logo-color);letter-spacing:.1em">TRIDGE</div>'
+    +'<div style="width:1px;height:20px;background:var(--border2)"></div>'
+    +'<div style="font-size:13px;color:var(--text2)">'+esc(S.companyName)+'</div>'
+    +'<div style="padding:3px 12px;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);border-radius:20px;font-size:11px;color:var(--red);font-weight:700">🔴 LIVE</div>'
+    +'</div>'
+    +'<div style="display:flex;align-items:center;gap:12px">'
+    +'<span style="font-size:12px;color:var(--text2)">블라인드</span>'
+    +'<div id="live-toggle" class="toggle-pill'+(S.blindMode?' on':'')+'" onclick="toggleLiveBlind()"><div class="toggle-thumb"></div></div>'
+    +'<span id="live-blind-lbl" style="font-size:11px;font-family:monospace;color:var(--text3)">'+(S.blindMode?'ON':'OFF')+'</span>'
+    +'<button onclick="closeLiveMode()" style="background:var(--card2);border:1px solid var(--border2);color:var(--text2);padding:7px 14px;border-radius:8px;cursor:pointer;font-family:inherit;font-size:12px">✕ 종료</button>'
+    +'</div></div>'
+    +'<div style="max-width:1100px;margin:0 auto;padding:36px 28px">'
+    +'<div style="text-align:center;margin-bottom:40px">'
+    +'<div style="font-size:11px;color:var(--teal);letter-spacing:.14em;text-transform:uppercase;margin-bottom:10px">TRIDGE 데이터 솔루션 — 소싱 경쟁력 진단</div>'
+    +'<div style="font-size:44px;font-weight:800;letter-spacing:-.02em;margin-bottom:8px">'+esc(S.companyName)+'</div>'
+    +'<div style="font-size:16px;color:var(--text2)">실시간 수입 데이터 분석 결과</div>'
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px">'
+    +'<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid var(--teal);border-radius:14px;padding:24px;text-align:center"><div style="font-size:38px;font-weight:800;color:var(--teal)">'+(p?p.totVolTons:'?')+'t</div><div style="font-size:12px;color:var(--text2);margin-top:4px">누적 수입 물량</div></div>'
+    +'<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid var(--blue);border-radius:14px;padding:24px;text-align:center"><div style="font-size:38px;font-weight:800;color:var(--blue)">$'+(p?p.totValMil:'?')+'M</div><div style="font-size:12px;color:var(--text2);margin-top:4px">누적 수입 금액</div></div>'
+    +'<div style="background:var(--card);border:1px solid rgba(239,68,68,.3);border-top:2px solid var(--red);border-radius:14px;padding:24px;text-align:center"><div style="font-size:38px;font-weight:800;color:var(--red)">$'+totalRoi+'K</div><div style="font-size:12px;color:var(--text2);margin-top:4px">연간 절감 기회</div></div>'
+    +(hs?'<div style="background:var(--card);border:1px solid var(--border);border-top:2px solid '+hs.color+';border-radius:14px;padding:24px;text-align:center"><div style="font-size:38px;font-weight:800;color:'+hs.color+'">'+hs.total+'점</div><div style="font-size:12px;color:var(--text2);margin-top:4px">소싱 헬스스코어</div></div>':'')
+    +'</div>'
+    +(S.blindMode?'<div style="background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.2);border-radius:14px;padding:32px;text-align:center;margin-bottom:28px">'
+      +'<div style="font-size:24px;font-weight:800;margin-bottom:10px">🔒 경쟁사 데이터가 잠겨 있습니다</div>'
+      +'<div style="font-size:14px;color:var(--text2);margin-bottom:18px">트릿지 구독 시 경쟁사명·정확한 단가·공급사 상세 정보가 모두 공개됩니다</div>'
+      +'<div onclick="toggleLiveBlind()" style="display:inline-block;padding:12px 32px;background:var(--teal);color:#000;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer">🔓 지금 공개하기</div>'
+      +'</div>':'')
+    +(findings.length?'<div style="background:var(--card);border:1px solid var(--border2);border-radius:14px;padding:24px">'
+      +'<div style="font-size:10px;font-weight:700;color:var(--text2);letter-spacing:.1em;text-transform:uppercase;margin-bottom:16px">🔍 핵심 발견</div>'
+      +findings.map(function(f,i){
+        var c={red:'var(--red)',amber:'var(--amber)',teal:'var(--teal)',blue:'var(--blue)'}[f.color]||'var(--teal)';
+        return '<div style="display:flex;gap:14px;padding:14px;background:rgba(255,255,255,.02);border-radius:10px;margin-bottom:10px;border-left:3px solid '+c+'">'
+          +'<div style="font-size:22px;font-weight:900;color:'+c+';flex-shrink:0">'+(i+1)+'</div>'
+          +'<div style="font-size:14px;line-height:1.7">'+f.text+'</div></div>';
+      }).join('')
+      +'</div>':'')
+    +'</div></div>';
+}
+
+function toggleLiveBlind(){
+  S.blindMode=!S.blindMode;
+  var el=document.getElementById('live-overlay');
+  if(el)el.innerHTML=buildLiveHTML();
+}
+
+function closeLiveMode(){
+  var el=document.getElementById('live-overlay');
+  if(el)el.remove();
+  S.liveMode=false;S.blindMode=false;render();
+}
+
+function rMatchingReview(){
+  var cats=Object.keys(S.categoryMatchings);
+  if(!cats.length){
+    return '<div class="empty-state"><div class="empty-icon">🔍</div>'
+      +'<p>매칭 데이터가 없습니다.<br>카테고리 선택 단계로 돌아가 데이터를 업로드해주세요.</p>'
+      +'<button class="btn-ghost" onclick="S.step=3;render()">← 카테고리 선택</button></div>';
+  }
+
+  var html='<div class="fade-in">'
+    +'<div class="sec-header"><div>'
+    +'<div class="sec-eyebrow" style="color:var(--teal)">Step 3.5 — AI 품목 매칭</div>'
+    +'<h2 class="sec-title">품목 매칭 확인</h2>'
+    +'<p class="sec-sub">AI 제안을 검토하고 포함/제외를 최종 결정하세요. 이 결과로 시장 비교가 실행됩니다.</p>'
+    +'</div><button class="btn-ghost btnsm" onclick="S.step=3;render()">← 카테고리 선택</button></div>';
+
+  cats.forEach(function(cat){
+    var result=S.categoryMatchings[cat]||{};
+    var matches=result.matches||[];
+    var approved=matches.filter(function(m){return m.approved;}).length;
+
+    html+='<div class="card">'
+      +'<div class="ctitle">📂 '+esc(cat)
+      +' <span class="cbadge">'+approved+'/'+matches.length+' 포함</span>'
+      +(result._fallback?'<span class="cbadge" style="background:rgba(251,191,36,.1);color:var(--amber)">⚠ 자동매칭</span>':'')
+      +'</div>';
+
+    if(!matches.length){
+      html+='<div style="color:var(--text3);font-size:13px;padding:12px 0">'
+        +'매칭 결과 없음 — 카테고리 기준으로 전체 데이터를 사용해 분석합니다.</div></div>';
+      return;
+    }
+
+    html+='<table class="dtbl"><thead><tr>'
+      +'<th>고객사 품목</th><th>시장 품목</th><th>유사도</th><th>AI 판단</th><th>포함여부</th>'
+      +'</tr></thead><tbody>';
+
+    matches.forEach(function(m,idx){
+      var sc=m.similarity>=90?'var(--teal)':m.similarity>=70?'var(--amber)':'var(--red)';
+      html+='<tr class="'+(m.approved?'best':'')+'">'
+        +'<td style="font-size:11px">'+esc((m.clientProd||'').slice(0,28))+'</td>'
+        +'<td style="font-size:11px">'+esc((m.mktProd||'').slice(0,28))+'</td>'
+        +'<td style="color:'+sc+';font-weight:700">'+(m.similarity||0)+'%</td>'
+        +'<td>'+(m.recommendation==='include'
+          ?'<span class="tag tagt">✓ 포함권장</span>'
+          :'<span class="tag tagr">✗ 제외권장</span>')
+        +'<div style="font-size:10px;color:var(--text3);margin-top:2px">'+esc(m.reason||'')+'</div></td>'
+        +'<td><label style="display:flex;align-items:center;gap:6px;cursor:pointer">'
+        +'<input type="checkbox" '+(m.approved?'checked':'')
+        +' onchange="toggleMatch(\''+cat.replace(/'/g,"\\'")+'\','+idx+',this.checked)">'
+        +'<span style="font-size:11px;color:'+(m.approved?'var(--teal)':'var(--text3)')+'">'
+        +(m.approved?'포함':'제외')+'</span>'
+        +'</label></td></tr>';
+    });
+
+    html+='</tbody></table></div>';
+  });
+
+  html+='<div style="text-align:center;padding:16px 0">'
+    +'<button class="btn-primary" onclick="runComparison()">✅ 확인 완료 — 시장 비교 시작 →</button>'
+    +'</div></div>';
+
+  return html;
+}
+
+function toggleMatch(cat,idx,checked){
+  if(S.categoryMatchings[cat]&&S.categoryMatchings[cat].matches[idx])
+    S.categoryMatchings[cat].matches[idx].approved=checked;
+  render();
+}
+
 function render(){renderStepBar();var c=document.getElementById('main');if(S.loading){
     var stepsHtml='';
     if(S.loadingSteps&&S.loadingSteps.length){
@@ -645,246 +744,3 @@ var THEMES=[
   {id:'warm',    name:'웜 베이지',  bg:'linear-gradient(135deg,#FDF8F3,#FFFBF7)',accent:'#C2410C', dark:false},
   {id:'cloud',   name:'클라우드',   bg:'linear-gradient(135deg,#EEF2FF,#FFFFFF)', accent:'#4F46E5', dark:false},
 ];
-var APP_SETTINGS={theme:'dark',fontSize:'md',compactMode:false};
-
-function loadSettings(){
-  try{var s=localStorage.getItem('tridge_v8_settings');if(s)APP_SETTINGS=Object.assign(APP_SETTINGS,JSON.parse(s));}catch(e){}
-  applySettings();
-}
-
-function saveSettings(){
-  try{localStorage.setItem('tridge_v8_settings',JSON.stringify(APP_SETTINGS));}catch(e){}
-}
-
-function applySettings(){
-  document.documentElement.setAttribute('data-theme',APP_SETTINGS.theme);
-  var fontMap={sm:'13px',md:'14px',lg:'16px'};
-  document.documentElement.style.fontSize=fontMap[APP_SETTINGS.fontSize]||'14px';
-  if(APP_SETTINGS.compactMode){
-    document.documentElement.style.setProperty('--card-padding','16px');
-  } else {
-    document.documentElement.style.removeProperty('--card-padding');
-  }
-}
-
-function setTheme(id){
-  APP_SETTINGS.theme=id;
-  saveSettings();
-  applySettings();
-  renderSettingsPanel();
-}
-
-function setFontSize(sz){
-  APP_SETTINGS.fontSize=sz;
-  saveSettings();
-  applySettings();
-  renderSettingsPanel();
-}
-
-function toggleCompact(){
-  APP_SETTINGS.compactMode=!APP_SETTINGS.compactMode;
-  saveSettings();
-  applySettings();
-  renderSettingsPanel();
-}
-
-var settingsOpen=false;
-function toggleSettings(){
-  settingsOpen=!settingsOpen;
-  if(settingsOpen)renderSettingsPanel();
-  else{var el=document.getElementById('settings-overlay');if(el)el.remove();}
-}
-
-function renderSettingsPanel(){
-  var existing=document.getElementById('settings-overlay');
-  if(existing)existing.remove();
-  if(!settingsOpen)return;
-
-  var themeCards=THEMES.map(function(t){
-    var active=APP_SETTINGS.theme===t.id;
-    var previewBorder=t.dark?'1px solid rgba(255,255,255,.1)':'1px solid rgba(0,0,0,.1)';
-    var nameCol=t.dark?'color:var(--text2)':'color:#333';
-    var card='<div class="theme-card'+(active?' active':'')+'" onclick="setTheme(this.dataset.id)" data-id="'+t.id+'">'
-      +'<div class="theme-preview" style="background:'+t.bg+';border:'+previewBorder+'">'
-      +'<div style="width:40%;height:8px;background:'+t.accent+';border-radius:4px;margin:6px auto"></div>'
-      +'</div>'
-      +'<div class="theme-name" style="'+nameCol+'">'+(active?'✓ ':'')+t.name+'</div>'
-      +'</div>';
-    return card;
-  }).join('');
-
-  var fontBtns=['sm','md','lg'].map(function(sz){
-    var labels={sm:'작게',md:'보통',lg:'크게'};
-    var active=APP_SETTINGS.fontSize===sz;
-    return '<button class="font-size-btn'+(active?' active':'')+'" onclick="setFontSize(\''+sz+'\')">'+labels[sz]+'</button>';
-  }).join('');
-
-  var panel='<div class="settings-overlay" id="settings-overlay" onclick="if(event.target===this){settingsOpen=false;this.remove()}">'
-    +'<div class="settings-panel">'
-    +'<div class="settings-panel-title">⚙ 설정<button onclick="settingsOpen=false;document.getElementById(\'settings-overlay\').remove()" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:18px">✕</button></div>'
-
-    // 테마
-    +'<div><div class="settings-section-label">🎨 테마</div>'
-    +'<div class="theme-grid">'+themeCards+'</div></div>'
-
-    // 글자 크기
-    +'<div><div class="settings-section-label">🔤 글자 크기</div>'
-    +'<div class="font-size-row">'+fontBtns+'</div></div>'
-
-    // 기타 옵션
-    +'<div><div class="settings-section-label">⚙ 기타</div>'
-    +'<div class="settings-toggle-row"><span class="settings-toggle-label">컴팩트 모드</span>'
-    +'<div class="mini-toggle'+(APP_SETTINGS.compactMode?' on':'')+'" onclick="toggleCompact()"><div class="mini-toggle-thumb"></div></div></div>'
-    +'<div class="settings-toggle-row"><span class="settings-toggle-label">블라인드 기본값</span>'
-    +'<div class="mini-toggle'+(S.blindMode?' on':'')+'" onclick="S.blindMode=!S.blindMode;renderSettingsPanel()"><div class="mini-toggle-thumb"></div></div></div>'
-    +'</div>'
-
-    // 버전 정보
-    +'<div style="margin-top:auto;padding-top:16px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);text-align:center">'
-    +'Tridge 데이터 솔루션 분석기 v8.0<br>© Tridge</div>'
-    +'</div></div>';
-
-  var el=document.createElement('div');
-  el.id='settings-overlay';
-  el.innerHTML=panel;
-  // 이미 존재하면 교체
-  document.body.appendChild(el);
-}
-
-// 페이지 로드 시 설정 적용
-if(document.readyState==='loading'){
-  document.addEventListener('DOMContentLoaded',loadSettings);
-}else{
-  loadSettings();
-}
-
-// ══════════════════════════════════════
-// 기능 1,3: 분석 결과 저장 + 히스토리
-// ══════════════════════════════════════
-var HISTORY_KEY='tridge_v8_history';
-var LAST_KEY='tridge_v8_last';
-
-function saveAnalysis(){
-  if(!S.portfolio)return;
-  try{
-    // 마지막 분석 저장 (전체 상태)
-    var saveData={
-      companyName:S.companyName,
-      companyMemo:S.companyMemo,
-      portfolio:{
-        totVolTons:S.portfolio.totVolTons,
-        totValMil:S.portfolio.totValMil,
-        avgP:S.portfolio.avgP,
-        cnt:S.portfolio.cnt,
-        yrData:S.portfolio.yrData,
-        hsData:S.portfolio.hsData,
-        supData:S.portfolio.supData,
-        origData:S.portfolio.origData,
-        prodData:S.portfolio.prodData,
-        concRisk:S.portfolio.concRisk,
-        topImporter:S.portfolio.topImporter,
-        disappeared:S.portfolio.disappeared,
-        anomalies:S.portfolio.anomalies,
-        latestYear:S.portfolio.latestYear,
-        qData:S.portfolio.qData,
-        monthData:S.portfolio.monthData
-      },
-      comparisons:S.comparisons,
-      healthScore:S.healthScore,
-      waterfall:S.waterfall,
-      negMatrix:S.negMatrix,
-      findings:S.findings,
-      insights:S.insights,
-      selectedCategories:S.selectedCategories,
-      categoryMatchings:S.categoryMatchings,
-      step:S.step,
-      savedAt:new Date().toISOString()
-    };
-    localStorage.setItem(LAST_KEY,JSON.stringify(saveData));
-
-    // 히스토리에 추가
-    var history=loadHistory();
-    var entry={
-      id:Date.now(),
-      date:new Date().toLocaleDateString('ko-KR'),
-      time:new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}),
-      company:S.companyName||'(미입력)',
-      categories:S.selectedCategories,
-      roi:Object.values(S.comparisons||{}).reduce(function(s,c){return s+(c?c.roiK:0);},0),
-      score:S.healthScore?S.healthScore.total:null,
-      volTons:S.portfolio.totVolTons,
-      valMil:S.portfolio.totValMil
-    };
-    history.unshift(entry);
-    if(history.length>20)history=history.slice(0,20);
-    localStorage.setItem(HISTORY_KEY,JSON.stringify(history));
-    console.log('분석 저장 완료');
-  }catch(e){console.warn('저장 실패:',e);}
-}
-
-function loadHistory(){
-  try{return JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]');}catch(e){return [];}
-}
-
-function loadLastAnalysis(){
-  try{
-    var data=JSON.parse(localStorage.getItem(LAST_KEY)||'null');
-    if(!data)return false;
-    S.companyName=data.companyName||'';
-    S.companyMemo=data.companyMemo||'';
-    S.portfolio=data.portfolio;
-    S.comparisons=data.comparisons||{};
-    S.healthScore=data.healthScore;
-    S.waterfall=data.waterfall;
-    S.negMatrix=data.negMatrix;
-    S.findings=data.findings;
-    S.insights=data.insights;
-    S.selectedCategories=data.selectedCategories||[];
-    S.categoryMatchings=data.categoryMatchings||{};
-    S.step=data.step||2;
-    return true;
-  }catch(e){return false;}
-}
-
-// saveAnalysis는 runComparison 내부에서 직접 호출됨
-
-// ── 히스토리 패널 렌더링 ──
-function rHistory(){
-  var history=loadHistory();
-  if(!history.length){
-    return '<div style="color:var(--text3);font-size:13px;text-align:center;padding:20px">아직 저장된 분석이 없습니다.</div>';
-  }
-  return history.map(function(h){
-    return '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:8px">'      +'<input type="checkbox" class="hist-chk" data-id="'+h.id+'" onclick="event.stopPropagation()" style="margin-top:14px;width:15px;height:15px;cursor:pointer;flex-shrink:0">'      +'<div class="hist-card" onclick="restoreHistory('+h.id+')">'      +'<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">'      +'<div style="font-size:13px;font-weight:700;color:var(--text1)">'+esc(h.company)+'</div>'      +'<div style="font-size:11px;color:var(--text3)">'+h.date+' '+h.time+'</div>'      +'</div>'      +'<div style="display:flex;gap:8px;flex-wrap:wrap">'      +(h.categories&&h.categories.length?'<span style="font-size:11px;background:rgba(0,201,167,.1);color:var(--teal);padding:2px 8px;border-radius:10px">'+h.categories.join(', ')+'</span>':'')      +(h.roi>0?'<span style="font-size:11px;background:rgba(239,68,68,.1);color:var(--red);padding:2px 8px;border-radius:10px">$'+h.roi+'K ROI</span>':'')      +(h.score?'<span style="font-size:11px;background:rgba(59,130,246,.1);color:var(--blue);padding:2px 8px;border-radius:10px">'+h.score+'점</span>':'')      +'</div>'      +'</div>'      +'</div>';
-  }).join('');
-}
-function deleteSelectedHistory(){
-  var checked=document.querySelectorAll('.hist-chk:checked');
-  if(!checked.length){alert('삭제할 항목을 선택해주세요.');return;}
-  if(!confirm(checked.length+'개 항목을 삭제할까요?'))return;
-  var ids=Array.from(checked).map(function(el){return Number(el.dataset.id);});
-  var history=loadHistory().filter(function(h){return ids.indexOf(h.id)<0;});
-  try{localStorage.setItem(HISTORY_KEY,JSON.stringify(history));}catch(e){}
-  renderHistoryPanel();
-}
-
-
-function restoreHistory(id){
-  var history=loadHistory();
-  var entry=history.find(function(h){return h.id===id;});
-  if(!entry)return;
-  // 마지막 저장본 불러오기 (company명 매칭)
-  if(loadLastAnalysis()&&S.companyName===entry.company){
-    render();
-    var overlay=document.getElementById('history-overlay');
-    if(overlay)overlay.remove();
-    historyOpen=false;
-  }else{
-    alert('해당 분석의 상세 데이터를 찾을 수 없습니다. 가장 최근 분석만 복원 가능합니다.');
-  }
-}
-
-// ══════════════════════════════════════
-// 기능 4: 미팅 준비 체크리스트
-// ══════════════════════════════════════
-async function genMeetingPrep(){
